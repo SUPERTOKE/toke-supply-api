@@ -5,15 +5,16 @@ export async function GET(request: Request) {
   try {
     const result = await getCirculatingSupplyToke();
     
-    // This creates the JSON structure: {"circulatingSupply": 419700154.123}
+    // THIS IS THE FIX: Wrapping the result in an object with the required key
     return NextResponse.json({
       circulatingSupply: Number(result)
     });
 
   } catch (error) {
+    console.error('Error fetching circulating supply:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch supply' },
-      { status: 500 }
+      { success: false, error: 'Failed to fetch circulating supply' },
+      { status: 500 },
     );
   }
 }
