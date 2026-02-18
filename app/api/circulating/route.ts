@@ -5,9 +5,11 @@ export async function GET(request: Request) {
   try {
     const result = await getCirculatingSupplyToke();
     
-    // THIS IS THE FIX: Wrapping the result in an object with the required key
+    // Returning multiple keys to verify JSON structure
     return NextResponse.json({
-      circulatingSupply: Number(result)
+      circulatingSupply: Number(result),
+      total: 0,
+      lastUpdated: new Date().toISOString() // Added a timestamp to verify the data is fresh
     });
 
   } catch (error) {
