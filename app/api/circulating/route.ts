@@ -6,16 +6,16 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const debug = searchParams.get('debug') === '1';
     
-    // Fetch the supply data from your library
-    const result = await getCirculatingSupplyToke();
+    // Get the numeric value
+    const supplyValue = await getCirculatingSupplyToke();
 
-    // The image requirement specifically asks for: {"circulatingSupply": number}
-    const responseBody = {
-      circulatingSupply: typeof result === 'object' ? result.circulatingSupply : result
+    // Force the correct JSON structure: {"circulatingSupply": 419700154.123}
+    const data = { 
+      circulatingSupply: Number(supplyValue) 
     };
 
-    // If debug is requested, you can return the full result object instead
-    return NextResponse.json(debug ? result : responseBody);
+    // If debug is on, you can return everything, otherwise return exactly what the tracker wants
+    return NextResponse.json(debug ? { ...data, raw: supplyValue } : data);
     
   } catch (error) {
     console.error('Error fetching circulating supply:', error);
