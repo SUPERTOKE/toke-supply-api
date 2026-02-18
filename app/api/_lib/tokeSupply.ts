@@ -4,11 +4,9 @@ type JsonRpcError = { jsonrpc: '2.0'; id: string; error: { code: number; message
 // Hardcoded Mint Address
 const DEFAULT_TOKE_MINT = 'AmgUMQeqW8H74trc8UkKjzZWtxBdpS496wh4GLy2mCpo';
 
-function getSolanaRpcUrl(): string {
-  // Removed Helius - Using Public RPC
-  return 'https://api.mainnet-beta.solana.com';
-}
-
+/**
+ * Standard fetch wrapper for RPC calls
+ */
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
   if (!res.ok) {
@@ -18,9 +16,12 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
-export async function getTotalSupplyToke() {
+/**
+ * Fetches the EXACT total supply from the Solana Mainnet RPC
+ */
+export async function getCirculatingSupplyToke() {
   const mint = DEFAULT_TOKE_MINT;
-  const rpcUrl = getSolanaRpcUrl();
+  const rpcUrl = 'https://api.mainnet-beta.solana.com';
 
   const body = {
     jsonrpc: '2.0',
@@ -29,53 +30,32 @@ export async function getTotalSupplyToke() {
     params: [mint],
   };
 
-  const rpc = await fetchJson<JsonRpcSuccess<any> | JsonRpcError>(rpcUrl, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-    cache: 'no-store', // Bypasses cache
-  });
-
-  if ('error' in rpc) {
-    throw new Error(`RPC error ${rpc.error.code}: ${rpc.error.message}`);
-  }
-
-  return {
-    totalSupply: Number(rpc.result.value.uiAmountString),
-    decimals: rpc.result.value.decimals
-  };
-}
-
-export async function getCirculatingSupplyToke() {
-  const mint = DEFAULT_TOKE_MINT;
-
   try {
-    const dexUrl = `https://api.dexscreener.com/latest/dex/tokens/${mint}`;
-    const dex = await fetchJson<any>(dexUrl, {
-      method: 'GET',
-      headers: { accept: 'application/json' },
-      cache: 'no-store',
+    const rpc = await fetchJson<JsonRpcSuccess<any> | JsonRpcError>(rpcUrl, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+      cache: 'no-store', // Ensures fresh data
     });
 
-    const pairs = (dex.pairs || []).filter((p: any) => (p.chainId || '').toLowerCase() === 'solana');
-    const best = pairs.sort((a: any, b: any) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
-    
-    if (!best) throw new Error('No Solana pairs');
+    if ('error' in rpc) {
+      throw new Error(`RPC error ${rpc.error.code}: ${rpc.error.message}`);
+    }
 
-    const priceUsd = Number(best.priceUsd);
-    const marketCapUsd = typeof best.marketCap === 'number' ? best.marketCap : best.fdv;
-
-    const circulating = marketCapUsd / priceUsd;
+    // uiAmountString is the most accurate representation of the supply
+    const exactSupply = Number(rpc.result.value.uiAmountString);
 
     return {
-      circulatingSupply: circulating,
-      total: 0 // As requested for verification
+      circulatingSupply: exactSupply,
+      source: 'rpc-direct'
     };
-  } catch (e) {
-    const total = await getTotalSupplyToke();
+
+  } catch (error) {
+    console.error('RPC Error:', error);
+    // Static fallback to your verified number if the RPC is down
     return {
-      circulatingSupply: total.totalSupply,
-      total: 0
+      circulatingSupply: 419700154.123,
+      source: 'static-fallback'
     };
   }
 }
