@@ -1,13 +1,21 @@
 import { NextResponse } from 'next/server';
-import { getTotalSupplyToke } from '../_lib/tokeSupply';
+import { fromExplorerSnapshot, getTotalSupplyToke, supplyHeaders } from '../_lib/tokeSupply';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET(request: Request) {
   try {
-    const debug = new URL(request.url).searchParams.get('debug') === '1';
-    const result = await getTotalSupplyToke();
-    return NextResponse.json(debug ? result : result.totalSupply);
+    const params = new URL(request.url).searchParams;
+    const debug = params.get('debug') === '1';
+    // ?debug=1&source=snapshot exercises the fallback path on demand (for checks).
+    const s = debug && params.get('source') === 'snapshot' ? await fromExplorerSnapshot() : await getTotalSupplyToke();
+    return NextResponse.json(debug ? s : s.totalSupply, { headers: supplyHeaders(s) });
   } catch (error) {
-    console.error('Error fetching total supply:', error);
-    return NextResponse.json({ success: false, error: 'Failed to fetch total TOKE supply' }, { status: 500 });
+    console.error('total supply unavailable:', error);
+    return NextResponse.json(
+      { success: false, error: 'TOKE supply temporarily unavailable' },
+      { status: 503, headers: { 'Cache-Control': 'no-store', 'Retry-After': '60' } },
+    );
   }
-} 
+}
